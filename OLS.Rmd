@@ -1,0 +1,500 @@
+---
+title: "OLS with interaction effects: Factors associated with subjective well-being"
+author: "Victoria Bolotova"
+output: 
+    html_document:
+      theme: cosmo
+      code_folding: show
+      toc: true
+      toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Literature review
+
+While numerous research are focused on the comparison of the level of subjective well-being (SWB) in different countries (https://worldpopulationreview.com/country-rankings/ha..), the argument for the cultural impact on the way people experience their lives makes is a curious topic for research to see how the level of SWB can differ within the country.
+
+«Traditional» determinants such as sex, age, income and employment status have been proven to have significant impact of the level of SWB across countries participated in the WVS (Codero J. M. et.al. 2017). 
+
+At the same time, there are more cultural factors that may have a great impact on the effect of these variables on the subjective well-being. 
+The level of religiosity, from that point of view seems to be one of the most important aspects of a person’s life, changing the political beliefs, the way one perceives his/her life and expectations one sets. Although some research found out that the importance of religion has been decreasing for the past few years (https://www.pewresearch.org/religion/2015/11/03/chapt..), with the increasing level of migration from more religious countries, Europe has become a religiously diverse place with different denominations (https://www.pewresearch.org/fact-tank/2018/05/29/10-k..), which obviously can affect both the general trend of SWB and the differentiation of the level of happiness between different population groups (Rizvi & Hossain, 2017).
+
+As many articles have shown, the level of religiosity moderates the effect of economic difficulties such as low wages, unemployment or economic inequality in the country on a subjective perception of well-being (Fabricatore A. et.al 2000, Hastings O. et.al. 2020, Joshanloo M. 2015). 
+
+In this study we would like to see how this moderation effect works in Finland. 
+
+Finland is the happiest country in the world: according to according to World Happiness Report, Finland has been on the 1st place 5 times in a row, as well as it has a well-developed social-democratic type of welfare state. Similarly, Finland is in the top places to immigrate to. With quite a high migration rate as well as welfare state benefits we would like to see how the cultural difference among the citizens of such a happy country differs according to the level of religiosity.
+
+**Age**
+
+Many studies has been focused on the relationship between age and subjective well being. There has been a debate among theorists on the question whether older people are happier or not since the emergence of the topic of SWB and life-satisfaction (LS) (Richard E. Lucas et.al. 2000). A literature review by López Ulloa et.al. argued that extent studies showed the U-shaped relation between age and subjective well-being. Here we aim to see how age influence SWB in Finland, the country with one of the best social support systems.
+
+**Gender**
+
+As for gender, according to one of the recent studies (Joshanloo M. et.al. 2019), women on average reported higher level of life satisfaction than men across income, education and employment groups. 
+The difference was found to be significant but very small. Here, we include gender and age as control variables, as we are more interested in health, religion and social justice.
+
+**Health**
+
+According to the Annual Review of Public Health (2019), the subjective well-being is influenced not only by the consequence of ill-health but also by the potential contributor to disease risk. Similarly, a meta-analysis by M. Okun et.al. (1984) has found that "health and subjective well-being were found to be positively and significantly related". Moreover, LS has been found to be both an outcome and a predictor of the poor health. Gana K. et. al. study (2013), where life satisfaction was positively correlated with physical health argued on life satisfaction as an outcome rather than a predictor. We are going to include this variable in our model to see whether health is significant and whether religiosity can impact the strength of the relationship for people in Finland.
+
+**Income**
+
+Income is argued to have an impact on subjective well-being. However, although the absolute income has a significant influence on well-being, among the richer samples, the magnitude of association is lower, as the power of social comparison is stronger (Reyes-García V. et.al. 2016). We, despite many studies arguing on the relative income influence, are going to focus on the absolute levels, as we are more interested in objective values rather than the social comparisons (which might be also interesting in cross-country study (Diener E. et.al. 1993)).
+
+**Perceived fairness**
+
+We would like to take into account the way people perceive social system within the country. The two variables about education and job that show how fair are job and education opportunities seem for people will be included. There are many studies that show the relationship between perceived justice and life satisfaction. For example, recent study (https://onlinelibrary.wiley.com/doi/abs/10.1002/jcop.22398) revealed that increasing the level of social justice across the 28 EU member states also increases the level of life satisfaction. We also would like to test the moderation effect of religiosity between perceived fairness of opportunities in getting education and job and life satisfaction. 
+
+
+## List of chosen variables
+
+- *Dependent variable:*
+
+  - **stflife** - respondent's estimation according to the 10-point scale: 'How satisfied with life as a whole'.
+
+- *Predictors:*
+
+  - **gndr** - gender of respondent; 
+
+  - **agea** - age of respondent;
+
+  - **evfrjob** - respondent's estimation according to the 10-point scale: 'Everyone in country fair chance get job they seek' ("To what extent do you think this statement applies in [Finland]?");
+
+  - **rlgdgr** - respondent's estimation according to the 10-point scale: 'How religious are you?' (Regardless of whether you belong to a particular religion, how religious would you say you are?);
+
+  - **evfredu** - respondent's estimation according to the 10-point scale: 'Everyone in country fair chance achieve level of education they seek' (To what extent do you think this statement applies in [Finland]?);
+
+  - **netinum** - respondent's answer: 'Your usual [weekly/monthly/annual] net [pay/pensions/social benefits]';
+
+  - **health** - respondent's answer: 'Subjective general health' according to provided categories.
+
+# Data preprocessing
+
+```{r}
+library(foreign)
+library(dplyr)
+library(haven)
+library(devtools)
+library(DescTools)
+library(pscl)
+library(margins)
+library(base)
+library(foreign)
+library(dplyr)
+library(ggplot2)
+library(sjPlot)
+library(cowplot)
+library(psych)
+
+df <- read_sav("ESS9DE.sav")
+df <- df %>% haven::as_factor()
+
+df <- df %>% 
+  dplyr::select(rlgdgr, evfrjob, evfredu, netinum, gndr, agea, stflife, health)
+```
+
+
+## Transformation of variables into correct type 
+
+```{r}
+df$rlgdgr <- as.numeric(as.factor(df$rlgdgr))
+df$stflife <- as.numeric(as.factor(df$stflife))
+df$evfrjob <- as.numeric(as.factor(df$evfrjob))
+df$evfredu <- as.numeric(as.factor(df$evfredu))
+df$netinum <- as.numeric(as.character(df$netinum))
+df$agea <- as.numeric(as.character(df$agea))
+df$health <- as.factor(df$health)
+```
+
+Now the lowest values of `stflife`, `rlgdgr`, `evfrjob`, `evfredu` equals to 1 and the highest equals to 11. However, we think it is acceptable as absolutely all values become higher on 1 unit, but everything was converted correctly. 
+
+
+# Descriptive statistics
+
+## Life satisfaction
+
+The great share of the respondents evaluate their life satisfaction as high, the median value is 9 out of 11. We observe lack of the observations among lower levels of estimations. 
+
+```{r}
+summary(df$stflife)
+```
+
+```{r}
+stflife_barplot  <- df %>% 
+  group_by(stflife) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = round(count/sum(count),3))
+
+ggplot(stflife_barplot, aes(x = stflife, y = percentage, fill = stflife)) + 
+  geom_bar(stat='identity', fill = "#fcbf49") + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="", 
+       y="",
+       title="Reported levels of life satisfaction") + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+
+
+## Gender
+
+There is an almost equal number of both genders respondents in the sample. The number of men prevails slightly. 
+
+```{r}
+df$gndr <- droplevels(df$gndr)
+summary(df$gndr)
+```
+
+```{r}
+sex_barplot  <- df %>% 
+  group_by(gndr) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = count/sum(count)) 
+
+ggplot(sex_barplot, aes(x = gndr, y = percentage, fill = gndr)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Gender", 
+       y="",
+       title="Gender distribution in data") +
+  scale_fill_manual("Gender", values = c('#c1d3fe', '#ffb5a7')) + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+**Life satisfaction and gender relationship**
+
+* According to the box plot sizes, we see that answers among both genders are grouped among higher estimations of life satisfaction equally. Thus, there are no serious differences in answers between genders. The mean and median is 9 as we have already noted earlier. 
+
+```{r}
+ggplot(df, aes(x = df$gndr, y = df$stflife)) +
+geom_boxplot() +
+stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4) +
+  labs(title = "Gender and Life Satisfaction", y = "Life Satisfaction", x = "Gender") + 
+theme_classic() 
+```
+
+* The bar plot also allows us to see almost equal shares of both genders among the whole scale.
+
+
+## Age
+
+There are respondents from 15 to 90 years old in the sample. The average age is about 50. 
+
+```{r}
+summary(df$agea)
+```
+
+There are no serious skews at the graph, there is a lack of observations among the very old ages but generally, all the age groups are represented. 
+
+```{r}
+ggplot(df, aes(agea)) +
+  geom_histogram(fill = "#fcbf49", bins = 20) +
+  labs(title = "Respondents' age",
+       x = "Age", 
+       y = " ") + 
+  scale_fill_manual("e9c46a") +
+  theme_classic()
+```
+
+**Life satisfaction and Age relationship**
+
+There is a variety of answers on higher life satisfaction among the age categories, but the linear trend is hardly revealing.
+
+```{r}
+ggplot(df, aes(agea, stflife)) +
+  geom_point(color = "grey") + 
+  geom_smooth(se = FALSE, color = "black") +
+  labs(title = "The relationship between age and life satisfaction", 
+       x = "Age", 
+       y = "Life satisfaction") +
+  theme_classic()
+```
+
+```{r}
+knots <- quantile(df$agea, p = c(0.25, 0.5, 0.75), na.rm = TRUE)
+library(splines)
+model_spline <- lm(stflife ~ bs(agea, knots = knots), data = df)
+tab_model(model_spline)
+```
+
+6th degree is significant
+
+Polynomial regression
+
+```{r}
+model_qu <- lm(stflife ~ agea + I(agea^2), data = df)
+tab_model(model_qu)
+```
+
+
+
+## Religiosity
+
+The mean value of religiosity is 5.2, the median is 6.
+
+```{r}
+summary(df$rlgdgr)
+```
+
+```{r}
+rlgdgr_barplot  <- df %>% 
+  group_by(rlgdgr) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = round(count/sum(count),3))
+
+ggplot(rlgdgr_barplot, aes(x = rlgdgr, y = percentage, fill = rlgdgr)) + 
+  geom_bar(stat='identity', fill = "#fcbf49") + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="", 
+       y="",
+       title="Religiosity level") + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+Most frequent answer about religiosity level is 1 - not religious at all (21% of respondents). However, 14%, 9%, 11%, 9% of respondents reported 6, 7, 8, and 9, respectively, on religiosity scale.
+
+
+## Fair chances of education
+
+Mean is 7.4 and median is 8, so most people agree with the statement that everyone in country have fair chance achieve level of education they seek. Most frequent answer is 9 (17% of respondents), then goes 6 (15% of respondents), and finally 8 (13.5% of respondents). 1 (1.4%) and 2 (1%) are the least frequent answers. 
+
+```{r}
+summary(df$evfredu)
+```
+
+
+```{r}
+evfredu_barplot  <- df %>% 
+  group_by(evfredu) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = round(count/sum(count),3))
+
+ggplot(evfredu_barplot, aes(x = evfredu, y = percentage, fill = evfredu)) + 
+  geom_bar(stat='identity', fill = "#fcbf49") + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="", 
+       y="",
+       title="Fair chances of education") + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+
+## Usual net payment
+
+There answers with a net payment amount from 0 to 100000 are represented.
+
+```{r}
+summary(df$netinum)
+```
+
+The graph shows poor distribution with an overpoise in favor of 0. We have to transform the variable. 
+
+```{r}
+library(ggplot2)
+ggplot(df, aes(x = df$netinum)) +
+  geom_histogram () + 
+  labs(title = "Participants' usual net payment",
+       x = "Net payment",  y = " ") + 
+  theme_classic() 
+```
+
+*Log transformation*
+
+```{r}
+df$netinum_log10 <- log(df$netinum + 1)
+```
+
+We have a new scale of values after the transformation and see the biggest share among the 7-8 points. 
+
+```{r}
+library(ggplot2)
+ggplot(df, aes(x = df$netinum_log10)) +
+  geom_histogram() + 
+  labs(title = "Participants' usual net payment",
+       x = "Net payment", y = " ") +
+   theme_classic() 
+```
+
+**Correlation matrix**
+
+To sum up all the possible correlations between numeric variables we provide the correlation matrix. 
+Life satisfaction has the highest correlation with estimation of fair chances to get the job (0.18). Then goes association between net income and life satisfaction (0.16), then goes association between life satisfaction and estimation of fair chances to get the education (0.12), and, finally, association between life satisfaction and religiosity (0.12). The smallest correlation is between life satisfaction and age (0.07).
+
+```{r}
+library(dplyr)
+sub <- df[c("stflife", "agea", "rlgdgr", "evfrjob", "evfredu", "netinum" )]
+```
+  
+```{r}
+library(sjPlot)
+matrix <- tab_corr(sub[,], corr.method = "spearman")
+matrix
+```
+
+## Health
+
+We observe 5 levels in this variables.
+
+```{r}
+df$health <- droplevels(df$health)
+summary(df$health)
+```
+
+The vast majority of the respondents (45%) note their health as "Good". The "Very bad" (1.5%) and "Bad categories" (7.8%) were chosen least of all. 
+
+```{r}
+health_barplot  <- df %>% 
+  group_by(health) %>% 
+ dplyr::summarize(count = n()) %>%  
+ mutate(percentage = count/sum(count)) 
+
+ggplot(health_barplot, aes(x = health, y = percentage, fill = health)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=scales::percent(percentage)), position = position_stack(vjust = .5)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Health", 
+       y="",
+       title="Reported levels of subjective health") +
+  scale_fill_manual("Gender", values = c('#76c893', '#b5e48c', '#f9c74f', '#f3722c', '#f94144')) + 
+  theme_classic() + 
+  theme(legend.position="none")
+```
+
+**Life satisfaction and health relationship**
+
+The first two box plots are quite short compared to the rest ones (looking at their upper and lower quartiles). It suggests that people who evaluate their health as 'Very good' and 'Good' mostly have common answers nothing their level of life satisfaction as high. Thus, the median for 'Very good' corresponds to the upper quartile (75th Percentile) with a life satisfaction of 10 and the median for 'Good' is in the lower quartile (25th Percentile) with a 9-point for life satisfaction. However, there are outliers - people who estimate their health as good and very good are not always satisfied with their life. 
+
+The rest of the 3 box plots are comparatively tall, it identifies that people among these groups with worse health estimations mark their life satisfaction with greater variation (paying attention to the size of boxes and whiskers), especially it is well-noticeable for the 'Very bad category'. 
+
+There is a noticeable difference in life satisfaction between people of different levels of health. 
+
+```{r}
+ggplot(df, aes(x = df$health, y = df$stflife)) +
+geom_boxplot() +
+stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4) +
+ggtitle("Relationship between Life satisfaction and Health")  +
+  labs(x="Health", 
+       y="Life Satisfaction",
+       title="Subjective Health and Life Satisfaction") +
+  theme_classic() 
+```
+
+
+
+# Modeling 
+
+## OLS models
+
+### Health 
+
+```{r}
+df1 <- na.omit(df)
+library(sjPlot)
+model_inter_1 <- lm(stflife ~ gndr + agea + health*rlgdgr,  data = df1)
+tab_model(model_inter_1)
+```
+
+* **Gender** is not significant at predicting life satisfaction of people in Finland
+* The relationship between **age** and life satisfaction is significant and positive. For each additional year the predicted life satisfaction of people in Finland is 0.01 higher, on average, holding everything else constant.
+
+*The interactions between religiosity and three categories of health are not significant, that is why we should interpret direct effect of these three categories on life satisfaction.*
+
+* For finnish people who reported **good level of health** the predicted life satisfaction is lower on 0.45, compared to finns who reported very good level of health, on average, holding everything else constant.
+* For finnish people who reported **fair level of health** the predicted life satisfaction is lower on 1.46, compared to finns who reported very good level of health, on average, holding everything else constant.
+* For finnish people who reported **bad level of health** the predicted life satisfaction is lower on 2.79, compared to finns who reported very good level of health, on average, holding everything else constant.
+
+* Only the interaction between the last category of health condition **very bad** and religiosity is significant. Beta shows how the beta for the people with  **very bad health** changes when religiosity increases by 1 unit. The 1 unit increase in religiosity leads to 0.35 increase in the effect of very bad health on life satisfaction. 
+
+* Adjusted R-squared is 0.13, it means that 13% of variance in life satisfaction of finns can be explained by the the model.
+
+### Visualization of interaction
+
+```{r}
+library(sjPlot)
+library(ggplot2)
+plot_model(model_inter_1, type="int", title = "Prediction of life satisfaction with interaction between level of health and religiosity", terms = c("stflife", "evfredu"), colors = "Set1") + ylab("Life satisfaction") + xlab("General health")+ 
+  theme_classic()
+```
+
+* For people with very bad health high religiosity results in higher life satisfaction as confidence intervals overlap only a little bit. People with very bad health and with the lowest level of religiosity tend to much less satisfied with their life, compared to people with also very bad health, but with the highest religiosity. 
+* As we see, religiosity works different for people with different health conditions in terms of life satisfaction - for people with other levels of health, religiosity is not significant moderator. We can assume that religion helps people with very bad health do not despair and do not lose hope, that is why very religious people are more satisfied with their life, despite their very bad health conditions. 
+
+
+### Everyone in country fair chance get job they seek
+
+```{r}
+model_inter_2 <- lm(stflife ~ gndr + agea + evfrjob*rlgdgr,  data = df1)
+tab_model(model_inter_2)
+```
+
+* **Gender** is not significant at predicting life satisfaction of people in Finland
+* The relationship between **age** and life satisfaction is significant and positive. For each additional year the predicted life satisfaction of people in Finland is 0.01 higher, on average, holding everything else constant.
+* Interaction between perceived fairness of getting a job and and religiosity is significant (but p-value equals to 0.04 -> close to insignificant result). The 1 unit increase in religiosity leads to 0.01 decrease in the effect of perceived fairness of getting a job on life satisfaction. 
+
+* Adjusted R-squared is 0.04, it means that 4% of variance in life satisfaction of finns can be explained by the the model.
+
+### Visualization of interaction
+
+```{r}
+library(sjPlot)
+library(ggplot2)
+plot_model(model_inter_2, type="int", title = "Prediction of life satisfaction with interaction between job and religiosity", terms = c("stflife", "evfredu"), colors = "Set1") + ylab("Life satisfaction") + xlab("Everyone in country fair chance get job they seek")+ 
+  theme_classic()
+```
+
+* From the interaction plot, we can see that for people that identified themselves as not religious at all, the effect of perceived fairness of getting job on life satisfaction is steeper, compared to those who identified themselves as very religious. Hence, for not at all religious people, the association between perceived fairness of getting job and life satisfaction is stronger, compared to very religious people. It seems that for not at all religious people the perceived fairness of getting job is more important for their life satisfaction than for very religious people.
+
+
+### Everyone in country fair chance achieve level of education they seek
+
+```{r}
+model_inter_3 <- lm(stflife ~ gndr + agea + evfredu*rlgdgr,  data = df1)
+tab_model(model_inter_3)
+```
+
+* **Gender** is not significant at predicting life satisfaction of people in Finland
+* The relationship between **age** and life satisfaction is significant and positive. For each additional year the predicted life satisfaction of people in Finland is 0.005 higher, on average, holding everything else constant.
+* Interaction between perceived fairness of getting an education and and religiosity is significant. The 1 unit increase in religiosity leads to 0.02 decrease in the effect of perceived fairness of getting an education on life satisfaction.
+
+* Adjusted R-squared is 0.035, it means that 3.5% of variance in life satisfaction of finns can be explained by the the model.
+
+### Visualization of interaction
+
+```{r}
+library(sjPlot)
+library(ggplot2)
+plot_model(model_inter_3, type="int", title = "Prediction of life satisfaction with interaction between education and religiosity", terms = c("stflife", "evfredu"), colors = "Set1") + ylab("Life satisfaction") + xlab("Everyone in country fair chance get education they seek")+ 
+  theme_classic()
+```
+
+* From the interaction plot, we can see that for people that identified themselves as very religious, life satisfaction is stable across all levels of perceived fairness of getting education (line is horizontal). Hence, for very religious people perceived fairness of getting education do not influence on their life satisfaction at all - for these people the life satisfaction does not really increase with belief in fairness of getting education.
+
+* However, for not at all religious finns the level of perceived fairness of getting education and life satisfaction is positively associated. The higher the level of perceived fairness of getting education, the higher life satisfaction of non-religious people in Finland.
+
+* Also, we would like to note that very religious people constantly estimate their life satisfaction higher, compared to not at all religious people, however, when estimated fairness of getting education is higher than 9, there is no statistically significant difference in life satisfaction between very religious and not at all religious in life satisfaction as confidence intervals overlap.
+
+
+### Income
+
+```{r}
+model_inter_4 <- lm(stflife ~ gndr + agea + netinum*rlgdgr,  data = df1)
+tab_model(model_inter_4)
+```
+
+* In this model only the direct effect of religiosity is significant at explaining life satisfaction of people in Finland. The relationship between religiosity and life satisfaction is positive. For each additional increase in religiosity the predicted life satisfaction of people in Finland is 0.04 higher, on average, holding everything else constant.
+
+* Adjusted R-squared is 0.01, it means that only 1% of variance in life satisfaction of finns can be explained by the the model.
+
+
